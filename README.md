@@ -17,6 +17,7 @@ Open [index.html](index.html) in a modern browser. No build, account, API key, o
 - A margin's **View source** shows its original snapshot. **Find in current draft** highlights a *possible* unique exact-text match; it does not rebind or claim the two occurrences are the same.
 - Search matches titles, current drafts, margin text, and quoted anchors.
 - Export a **JSON backup** and test importing a copy before relying on the notebook. Import **replaces** the current notebook after confirmation.
+- **Export note · .md** produces a human-readable copy of the selected note, current draft, source versions, and version-bound margins. Markdown export is **not** a restorable notebook backup.
 
 Keyboard: Ctrl/Cmd+S saves a version; Ctrl/Cmd+Alt+M opens a margin; Ctrl/Cmd+Alt+N creates a note; Ctrl/Cmd+Alt+D opens Today.
 
