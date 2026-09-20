@@ -17,7 +17,9 @@ Shape (abridged):
       id, kind, text, createdAt,
       versionId,
       anchor: null | { start, end, quote }
-    }]
+    }],
+    returnThreads?: [{ id, sourceVersionId, createdAt,
+      entries: [{ id, kind, text, createdAt }] }]
   }]
 }
 ```
@@ -25,6 +27,11 @@ Shape (abridged):
 A new note has a first source version. Editing changes the **draft**; `Save version` or attaching a margin commits a new snapshot when source body/title differs. Viewing a historical version disables editing that version but allows additional margins. Adding a margin while reading the latest draft commits the draft before binding the margin to that version. Import currently replaces the entire local notebook after confirmation. Deletion of a note or margin is destructive.
 
 Historical titles are preserved on versions created by the current code; legacy versions without a title fall back to the note's current title. This is a presentation fallback, **not proof of the original title**.
+
+
+## Return Threads · bounded re-entry
+
+Optional `returnThreads` live inside their owning note and bind to one saved `sourceVersionId`. Starting a thread from an edited current draft commits that draft as a source version; starting from history uses that exact prior version. Contributions of kind `reflection`, `question`, or `carry` append under the thread with separate IDs and timestamps, preserving previous contributions and the original source. Source view remains read-only even if the latest saved version has an unsaved divergent draft. Legacy schema-1 notebooks without `returnThreads` remain readable; import checks present thread structures and source references. See [Return Thread 001](RETURN-THREAD-001.md).
 
 ## Anchors and the missing relation
 

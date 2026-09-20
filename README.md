@@ -13,11 +13,12 @@ Open [index.html](index.html) in a modern browser. No build, account, API key, o
 - **+ Note** opens a blank page; **Today** reopens or creates one daily page for your device's local date.
 - **+ Identity Carry** creates an optional guided page. Ordinary writing does not need to follow its prompts.
 - Select text in the editor and choose **+ Margin** to attach witness, question, interpretation, correction, carry, or connection beside an exact saved source version. No selection creates a whole-note margin.
+- **+ Open a Return Thread** attaches an optional reflection, open question, or carry entry to a saved source version. **Return to thread** appends later contributions without editing the original source or earlier entries. **View original source** opens the exact frozen text in read-only mode.
 - **Save version** records a read-only snapshot. You can add margins to past versions without editing their text.
 - A margin's **View source** shows its original snapshot. **Find in current draft** highlights a *possible* unique exact-text match; it does not rebind or claim the two occurrences are the same.
-- Search matches titles, current drafts, margin text, and quoted anchors.
+- Search matches titles, current drafts, margin text, quoted anchors, and Return Thread contributions.
 - Export a **JSON backup** and test importing a copy before relying on the notebook. Import **replaces** the current notebook after confirmation.
-- **Export note · .md** produces a human-readable copy of the selected note, current draft, source versions, and version-bound margins. Markdown export is **not** a restorable notebook backup.
+- **Export note · .md** produces a human-readable copy of the selected note, current draft, source versions, version-bound margins, and Return Threads. Markdown export is **not** a restorable notebook backup.
 
 Keyboard: Ctrl/Cmd+S saves a version; Ctrl/Cmd+Alt+M opens a margin; Ctrl/Cmd+Alt+N creates a note; Ctrl/Cmd+Alt+D opens Today.
 
@@ -36,7 +37,7 @@ The app makes no inference about a person's identity and contains no AI reader. 
 5. Event time, recording time, editorial order, and known-at time must not be silently equated.
 6. The writer controls disclosure; preserving a private source does not authorize publication.
 
-See [Identity Carry](docs/IDENTITY-CARRY.md) for the writing practice and [Architecture](docs/ARCHITECTURE.md) for data model and known limitations.
+See [Return Thread 001](docs/RETURN-THREAD-001.md) for source-bound re-entry, [Identity Carry](docs/IDENTITY-CARRY.md) for the writing practice and [Architecture](docs/ARCHITECTURE.md) for data model and known limitations.
 
 ## Direction
 
