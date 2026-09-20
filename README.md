@@ -14,6 +14,7 @@ Open [index.html](index.html) in a modern browser. No build, account, API key, o
 - **+ Identity Carry** creates an optional guided page. Ordinary writing does not need to follow its prompts.
 - Select text in the editor and choose **+ Margin** to attach witness, question, interpretation, correction, carry, or connection beside an exact saved source version. No selection creates a whole-note margin.
 - **Save version** records a read-only snapshot. You can add margins to past versions without editing their text.
+- **↩ Return margin** appears while viewing an older saved version. It lets you write a fresh margin on that original version while retaining a separate reference to the later saved context. The original and later text remain independently preserved; this is not a claim that both readings mean the same thing.
 - A margin's **View source** shows its original snapshot. **Find in current draft** highlights a *possible* unique exact-text match; it does not rebind or claim the two occurrences are the same.
 - Search matches titles, current drafts, margin text, and quoted anchors.
 - Export a **JSON backup** and test importing a copy before relying on the notebook. Import **replaces** the current notebook after confirmation.
