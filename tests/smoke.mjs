@@ -66,6 +66,7 @@ $('dailyNote').click();
 const count = db().notes.length;
 $('dailyNote').click();
 assert.equal(db().notes.length,count,'Today reopens instead of duplicating');
+$('noteList').children[0].click(); // reopen the original search hit before attention assertions
 // ATTENTION-CROSSING: native local marks are append-only, anchored to source and not auto-selected.
 $('attentionWhole').click();
 $('attention-joyful').click();
