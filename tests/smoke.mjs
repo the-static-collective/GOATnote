@@ -17,6 +17,7 @@ class Element {
   replaceChildren(...xs) { this.children = xs; }
   append(...xs) { this.children.push(...xs); }
   focus() {}
+  select() { this.selectionStart=0; this.selectionEnd=this.value.length; }
   setSelectionRange(a,b) { this.selectionStart = a; this.selectionEnd = b; }
   click() { this.onclick?.(); }
   setAttribute(key,value) { this.attributes[key] = value; }
