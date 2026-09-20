@@ -9,7 +9,7 @@ const nodes = new Map();
 let serial = 0;
 class Element {
   constructor(tag = 'div') {
-    this.tag = tag; this.value = ''; this.textContent = '';
+    this.tag = tag; this.dataset = {}; this.attributes = {}; this.value = ''; this.textContent = '';
     this.hidden = false; this.disabled = false; this.readOnly = false;
     this.children = []; this.selectionStart = 0; this.selectionEnd = 0;
     this.files = []; this.style = {};
@@ -19,10 +19,12 @@ class Element {
   focus() {}
   setSelectionRange(a,b) { this.selectionStart = a; this.selectionEnd = b; }
   click() { this.onclick?.(); }
+  setAttribute(key,value) { this.attributes[key] = value; }
 }
 const document = {
   getElementById(id) { if (!nodes.has(id)) nodes.set(id,new Element()); return nodes.get(id); },
   createElement(tag) { return new Element(tag); },
+  querySelectorAll(selector) { if(selector==='[data-attention]') return ['joyful','useful','curiouser','none'].map(name=>{const id='attention-'+name;const node=this.getElementById(id);node.dataset.attention=name;return node});return []; },
   addEventListener() {},
 };
 const stored = new Map();
@@ -64,4 +66,28 @@ $('dailyNote').click();
 const count = db().notes.length;
 $('dailyNote').click();
 assert.equal(db().notes.length,count,'Today reopens instead of duplicating');
-console.log('GOATnote smoke: 7 checks passed. Browser/storage testing still required.');
+// ATTENTION-CROSSING: native local marks are append-only, anchored to source and not auto-selected.
+$('attentionWhole').click();
+$('attention-joyful').click();
+note = db().notes.find(n=>n.id===note.id);
+assert.equal(note.attention.length,1,'explicit note mark saved');
+assert.deepEqual(note.attention[0].dimensions,['joyful']);
+$('attention-useful').click();
+note = db().notes.find(n=>n.id===note.id);
+assert.deepEqual(note.attention[1].dimensions,['joyful','useful']);
+assert.equal(note.attention[1].previousId,note.attention[0].id,'revision preserved');
+$('attention-none').click();
+note = db().notes.find(n=>n.id===note.id);
+assert.equal(note.attention[2].explicitNone,true,'explicit none kept separately from untouched');
+$('attention-joyful').click();
+note = db().notes.find(n=>n.id===note.id);
+assert.deepEqual(note.attention.at(-1).dimensions,['joyful'],'none can be revised');
+$('body').setSelectionRange(2,12);
+$('attentionSelection').click();
+$('attention-curiouser').click();
+note = db().notes.find(n=>n.id===note.id);
+const crossing = note.attention.at(-1);
+assert.equal(crossing.kind,'passage');
+assert.equal(crossing.anchor.quote,note.versions.find(v=>v.id===crossing.versionId).text.slice(2,12));
+assert.equal(note.versions.find(v=>v.id===versionId).text,source,'mark did not rewrite historical source');
+console.log('GOATnote smoke: note/passage attention, revisions, explicit none, and source preservation passed. Browser/storage testing still required.');
