@@ -1,5 +1,5 @@
 /* GOATnote app-shell cache only. Never cache notebook contents or JSON exports. */
-const SHELL='goatnote-shell-v1';
+const SHELL='goatnote-shell-v2';
 const FILES=['./','./index.html','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(SHELL).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()));
