@@ -13,3 +13,4 @@ jobs:
           node-version: '22'
       - run: node --check sw.js
       - run: node tests/smoke.mjs
+      - run: node tests/returnMargin.mjs
