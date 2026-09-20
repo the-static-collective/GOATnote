@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { prepareReturnMargin } from '../returnMargin.mjs';
+const source = {id:'v-old',text:'original words'}, later={id:'v-new',text:'changed interpretation'};
+const note={id:'n1',versions:[source,later],margins:[{id:'m1',versionId:'v-old',text:'prior margin'}]};
+const r=prepareReturnMargin(note,{sourceVersionId:'v-old',returnVersionId:'v-new',marginId:'m2',actorRef:'human:local',relation:'reconsider'});
+assert.equal(r.sourceSnapshotText,'original words');
+assert.equal(r.returnSnapshotText,'changed interpretation');
+assert.equal(r.sourceVersionRef,'v-old');
+assert.equal(source.text,'original words');
+assert.equal(note.margins.length,1,'helper does not publish or write a margin');
+assert.throws(()=>prepareReturnMargin(note,{sourceVersionId:'v-old',returnVersionId:'v-old',marginId:'m2',actorRef:'human:local',relation:'carry'}));
+assert.throws(()=>prepareReturnMargin(note,{sourceVersionId:'v-old',returnVersionId:'v-new',marginId:'m1',actorRef:'human:local',relation:'carry'}));
+console.log('GOATNOTE-RETURN-001: pure return tests passed');
