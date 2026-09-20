@@ -8,6 +8,8 @@ GOATnote is an offline-first, source-preserving notebook for free writing, notes
 
 Open [index.html](index.html) in a modern browser. No build, account, API key, or AI service is required. This is an early browser prototype, **not yet a secure or production-grade archive**.
 
+**Android / installable app:** To host it, enable GitHub Pages for this repository in **Settings → Pages**, choosing deployment from `main` and the repository root (if that option is available). Once Pages publishes its URL, open that HTTPS URL in your mobile browser and use the browser's **Add to Home screen / Install app** option where supported. The service worker caches only the app shell for offline launches after a successful first visit; note content remains in that browser's local storage. A downloaded `index.html` can also be opened locally, but install/offline-worker features require a supported hosted origin. Do not assume GitHub Pages is already enabled or that local-file and hosted versions share note storage.
+
 - **+ Note** opens a blank page; **Today** reopens or creates one daily page for your device's local date.
 - **+ Identity Carry** creates an optional guided page. Ordinary writing does not need to follow its prompts.
 - Select text in the editor and choose **+ Margin** to attach witness, question, interpretation, correction, carry, or connection beside an exact saved source version. No selection creates a whole-note margin.
