@@ -198,7 +198,7 @@ function renderItem(room,item,index){
       el('p',{class:'gr-meta'},walk?(walkLabel(walk)+' · '+walk.stops.length+' stop'+(walk.stops.length===1?'':'s')):'Referenced Walk no longer exists.')
     );
     const row=el('div',{class:'gr-row'});
-    const enter=el('button',{type:'button',class:'primary'},'ENTER WALK');enter.disabled=!walk;
+    const enter=el('button',{type:'button',class:'primary'},walk&&walk.stops.length?'ENTER WALK':'EMPTY WALK');enter.disabled=!walk||!walk.stops.length;
     enter.addEventListener('click',()=>{dialog.close();walkAPI.playWalk(item.walkId);});
     const edit=el('button',{type:'button'},'OPEN WALK');edit.disabled=!walk;
     edit.addEventListener('click',()=>{dialog.close();walkAPI.openWalk(item.walkId);});
