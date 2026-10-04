@@ -6,7 +6,7 @@ const uid=api.uid;
 const stamp=api.stamp;
 let activeWalkId=null;
 let pendingTarget=null;
-let playerIndex=0;
+let playerIndex=0,playerStack=[];
 
 const el=(tag,attrs={},text='')=>{
   const node=document.createElement(tag);
@@ -21,6 +21,7 @@ const el=(tag,attrs={},text='')=>{
 };
 const walks=()=>api.getWalks();
 const active=()=>walks().find(w=>w.id===activeWalkId)||null;
+const walkById=id=>walks().find(w=>w.id===id)||null;
 const save=()=>api.saveWalks(walks());
 const clip=(s,n=110)=>String(s||'').replace(/\s+/g,' ').trim().slice(0,n)+(String(s||'').replace(/\s+/g,' ').trim().length>n?'…':'');
 const modeLabel=m=>({story:'Story',plan:'Plan',memory:'Memory Room',playlist:'Playlist',free:'Free Walk'}[m]||'Walk');
@@ -31,15 +32,36 @@ function createWalk(title='Untitled Walk',mode='free'){
 }
 function touch(w){w.updatedAt=stamp();save();}
 function targetLabel(t){return t.anchor?('“'+clip(t.anchor.quote,86)+'”'):(t.noteTitle||'Whole note');}
-function stopResolution(stop){return api.resolveStop(stop);}
+function walkReferencesWalk(startId,targetId,seen=new Set()){
+  if(startId===targetId)return true;
+  if(seen.has(startId))return false;
+  seen.add(startId);
+  const w=walkById(startId);if(!w)return false;
+  return w.stops.some(stop=>stop.kind==='walk'&&walkReferencesWalk(stop.walkId,targetId,seen));
+}
+function canNest(parentId,childId){
+  return !!walkById(parentId)&&!!walkById(childId)&&parentId!==childId&&!walkReferencesWalk(childId,parentId);
+}
+function stopResolution(stop){
+  if(stop.kind==='walk'){
+    const walk=walkById(stop.walkId);
+    return walk?{status:'exact',walk}:{status:'missing-walk',walk:null};
+  }
+  return api.resolveStop(stop);
+}
 
 function addStop(w,target){
   const stop={
-    id:uid(),noteId:target.noteId,versionId:target.versionId,
+    id:uid(),kind:'source',noteId:target.noteId,versionId:target.versionId,
     noteTitleAtAdd:target.noteTitle||'Untitled',
     anchor:target.anchor?{start:target.anchor.start,end:target.anchor.end,quote:target.anchor.quote}:null,
     transition:'',addedAt:stamp()
   };
+  w.stops.push(stop);touch(w);return stop;
+}
+function addWalkStop(w,child){
+  if(!w||!child||!canNest(w.id,child.id))return null;
+  const stop={id:uid(),kind:'walk',walkId:child.id,walkTitleAtAdd:child.title,transition:'',addedAt:stamp()};
   w.stops.push(stop);touch(w);return stop;
 }
 
@@ -160,13 +182,19 @@ function renderEditor(){
       addStop(w,t);renderEditor();
     }catch(err){alert(err.message||'Could not address that passage.');}
   });
+  const walkSelect=el('select',{'aria-label':'Choose another Walk as a door'});
+  walkSelect.append(el('option',{value:''},'Walk door…'));
+  walks().filter(child=>canNest(w.id,child.id)).forEach(child=>walkSelect.append(el('option',{value:child.id},child.title)));
+  const addWalk=el('button',{type:'button'},'+ WALK DOOR');
+  addWalk.disabled=walkSelect.options.length<=1;
+  addWalk.addEventListener('click',()=>{const child=walkById(walkSelect.value);if(child&&addWalkStop(w,child))renderEditor();});
   const play=el('button',{type:'button'},'WALK IT');
   play.disabled=!w.stops.length;
-  play.addEventListener('click',()=>{playerIndex=0;renderPlayer();});
+  play.addEventListener('click',()=>{playerStack=[];playerIndex=0;renderPlayer();});
   const exportMd=el('button',{type:'button'},'EXPORT .MD');
   exportMd.disabled=!w.stops.length;
   exportMd.addEventListener('click',()=>exportWalkMarkdown(w));
-  toolbar.append(addCurrent,play,exportMd);root.append(toolbar);
+  toolbar.append(addCurrent,walkSelect,addWalk,play,exportMd);root.append(toolbar);
 
   const stopList=el('div',{class:'gw-stops'});
   if(!w.stops.length)stopList.append(el('p',{class:'muted'},'Select a passage or leave nothing selected for the whole note, then choose + CURRENT SOURCE.'));
@@ -184,18 +212,26 @@ function renderEditor(){
 
 function renderStopCard(w,stop,index){
   const resolved=stopResolution(stop);
-  const card=el('article',{class:'gw-stop'+(resolved.status==='exact'?'':' unresolved')});
+  const exact=resolved.status==='exact';
+  const card=el('article',{class:'gw-stop'+(exact?'':' unresolved')});
   const head=el('div',{class:'gw-stop-head'});
-  head.append(el('span',{class:'gw-number'},String(index+1).padStart(2,'0')),el('span',{class:'gw-source'},stop.noteTitleAtAdd||resolved.note?.title||'Missing source'));
-  const badge=el('span',{class:'gw-badge'},resolved.status==='exact'?(stop.anchor?'PASSAGE':'WHOLE NOTE'):'UNRESOLVED');
+  const title=stop.kind==='walk'
+    ? (resolved.walk?.title||stop.walkTitleAtAdd||'Missing Walk')
+    : (stop.noteTitleAtAdd||resolved.note?.title||'Missing source');
+  head.append(el('span',{class:'gw-number'},String(index+1).padStart(2,'0')),el('span',{class:'gw-source'},title));
+  const badge=el('span',{class:'gw-badge'},!exact?'UNRESOLVED':stop.kind==='walk'?'WALK DOOR':stop.anchor?'PASSAGE':'WHOLE NOTE');
   head.append(badge);card.append(head);
 
-  const excerpt=el('blockquote',{},stop.anchor?stop.anchor.quote:(resolved.status==='exact'?clip(resolved.text,260):'Source address no longer resolves exactly.'));
-  card.append(excerpt);
-
-  if(resolved.status!=='exact'){
-    const why=resolved.status==='missing-note'?'The source note was deleted.':resolved.status==='missing-version'?'The saved source version is unavailable.':'The stored offsets no longer contain the exact quoted passage.';
-    card.append(el('p',{class:'gw-warning'},why+' GOATwalk will not silently rebind this stop.'));
+  if(stop.kind==='walk'){
+    card.append(el('blockquote',{},exact?(modeLabel(resolved.walk.mode)+' · '+resolved.walk.stops.length+' stop'+(resolved.walk.stops.length===1?'':'s')):'Referenced Walk no longer exists.'));
+    if(!exact)card.append(el('p',{class:'gw-warning'},'The Walk door is unresolved. GOATwalk will not redirect it to another Walk.'));
+  }else{
+    const excerpt=el('blockquote',{},stop.anchor?stop.anchor.quote:(exact?clip(resolved.text,260):'Source address no longer resolves exactly.'));
+    card.append(excerpt);
+    if(!exact){
+      const why=resolved.status==='missing-note'?'The source note was deleted.':resolved.status==='missing-version'?'The saved source version is unavailable.':'The stored offsets no longer contain the exact quoted passage.';
+      card.append(el('p',{class:'gw-warning'},why+' GOATwalk will not silently rebind this stop.'));
+    }
   }
 
   const transition=el('textarea',{rows:'2',placeholder:'Transition after this stop…','aria-label':'Transition after stop'},stop.transition||'');
@@ -203,14 +239,29 @@ function renderStopCard(w,stop,index){
   card.append(transition);
 
   const actions=el('div',{class:'gw-row'});
-  const source=el('button',{type:'button'},'OPEN SOURCE');source.disabled=resolved.status!=='exact';source.addEventListener('click',()=>{if(api.openStop(stop))dialog.close();});
+  const open=el('button',{type:'button'},stop.kind==='walk'?'OPEN WALK':'OPEN SOURCE');
+  open.disabled=!exact;
+  open.addEventListener('click',()=>{if(stop.kind==='walk'){activeWalkId=resolved.walk.id;renderEditor();}else if(api.openStop(stop))dialog.close();});
   const up=el('button',{type:'button','aria-label':'Move stop up'},'↑');up.disabled=index===0;up.addEventListener('click',()=>moveStop(w,index,index-1));
   const down=el('button',{type:'button','aria-label':'Move stop down'},'↓');down.disabled=index===w.stops.length-1;down.addEventListener('click',()=>moveStop(w,index,index+1));
   const remove=el('button',{type:'button',class:'danger'},'REMOVE');remove.addEventListener('click',()=>{w.stops.splice(index,1);touch(w);renderEditor();});
-  actions.append(source,up,down,remove);card.append(actions);
+  actions.append(open,up,down,remove);card.append(actions);
   return card;
 }
 function moveStop(w,from,to){const [x]=w.stops.splice(from,1);w.stops.splice(to,0,x);touch(w);renderEditor();}
+
+function advancePlayer(){
+  const w=active();if(!w){renderLibrary(false);return;}
+  if(playerIndex<w.stops.length-1){playerIndex++;renderPlayer();return;}
+  if(playerStack.length){
+    const parent=playerStack.pop();
+    activeWalkId=parent.walkId;
+    playerIndex=parent.index;
+    advancePlayer();
+    return;
+  }
+  renderEditor();
+}
 
 function renderPlayer(){
   const w=active();if(!w||!w.stops.length){renderEditor();return;}
@@ -220,46 +271,86 @@ function renderPlayer(){
   dialog.querySelector('#goatwalk-title').textContent=w.title;
   root.replaceChildren();
 
-  const stop=w.stops[playerIndex],resolved=stopResolution(stop);
-  const prog=el('div',{class:'gw-player-progress'},'STOP '+(playerIndex+1)+' / '+w.stops.length+' · '+modeLabel(w.mode));
+  const stop=w.stops[playerIndex],resolved=stopResolution(stop),exact=resolved.status==='exact';
+  const prog=el('div',{class:'gw-player-progress'},'STOP '+(playerIndex+1)+' / '+w.stops.length+' · '+modeLabel(w.mode)+(playerStack.length?' · DEPTH '+playerStack.length:''));
   root.append(prog);
   if(playerIndex>0&&w.stops[playerIndex-1].transition){
     const bridge=el('div',{class:'gw-bridge'});
     bridge.append(el('div',{class:'gw-eyebrow'},'BRIDGE'),el('p',{},w.stops[playerIndex-1].transition));
     root.append(bridge);
   }
-  const page=el('article',{class:'gw-player-page'+(resolved.status==='exact'?'':' unresolved')});
-  page.append(el('div',{class:'gw-eyebrow'},stop.anchor?'PASSAGE':'SOURCE'),el('h3',{},stop.noteTitleAtAdd||resolved.note?.title||'Missing source'));
-  if(resolved.status==='exact'){
-    const text=stop.anchor?stop.anchor.quote:resolved.version.text;
-    page.append(el('div',{class:'gw-player-text'},text));
+
+  const page=el('article',{class:'gw-player-page'+(exact?'':' unresolved')});
+  if(stop.kind==='walk'){
+    page.append(el('div',{class:'gw-eyebrow'},'WALK DOOR'),el('h3',{},resolved.walk?.title||stop.walkTitleAtAdd||'Missing Walk'));
+    if(exact){
+      page.append(el('div',{class:'gw-player-text'},modeLabel(resolved.walk.mode)+'\n\n'+resolved.walk.stops.length+' stop'+(resolved.walk.stops.length===1?'':'s')+' beyond this door.'));
+      const enter=el('button',{type:'button',class:'primary'},resolved.walk.stops.length?'ENTER WALK':'EMPTY WALK');
+      enter.disabled=!resolved.walk.stops.length;
+      enter.addEventListener('click',()=>{playerStack.push({walkId:w.id,index:playerIndex});activeWalkId=resolved.walk.id;playerIndex=0;renderPlayer();});
+      page.append(enter);
+    }else{
+      page.append(el('p',{class:'gw-warning'},'This Walk door is unresolved. No substitute route is chosen.'));
+    }
   }else{
-    page.append(el('p',{class:'gw-warning'},'This source address is unresolved. The Walk keeps the stop but does not substitute another text.'));
+    page.append(el('div',{class:'gw-eyebrow'},stop.anchor?'PASSAGE':'SOURCE'),el('h3',{},stop.noteTitleAtAdd||resolved.note?.title||'Missing source'));
+    if(exact){
+      const text=stop.anchor?stop.anchor.quote:resolved.version.text;
+      page.append(el('div',{class:'gw-player-text'},text));
+    }else{
+      page.append(el('p',{class:'gw-warning'},'This source address is unresolved. The Walk keeps the stop but does not substitute another text.'));
+    }
+    const open=el('button',{type:'button'},'OPEN EXACT SOURCE');open.disabled=!exact;open.addEventListener('click',()=>{if(api.openStop(stop))dialog.close();});
+    page.append(open);
   }
-  const open=el('button',{type:'button'},'OPEN EXACT SOURCE');open.disabled=resolved.status!=='exact';open.addEventListener('click',()=>{if(api.openStop(stop))dialog.close();});
-  page.append(open);root.append(page);
+  root.append(page);
 
   const nav=el('div',{class:'gw-player-nav'});
   const prev=el('button',{type:'button'},'← PREVIOUS');prev.disabled=playerIndex===0;prev.addEventListener('click',()=>{playerIndex--;renderPlayer();});
   const edit=el('button',{type:'button'},'EDIT WALK');edit.addEventListener('click',renderEditor);
-  const next=el('button',{type:'button'},playerIndex===w.stops.length-1?'END WALK':'NEXT →');next.addEventListener('click',()=>{if(playerIndex===w.stops.length-1)renderEditor();else{playerIndex++;renderPlayer();}});
+  const next=el('button',{type:'button'},playerIndex===w.stops.length-1?(playerStack.length?'RETURN ↩':'END WALK'):'NEXT →');
+  next.addEventListener('click',advancePlayer);
   nav.append(prev,edit,next);root.append(nav);
 }
 
 function exportWalkMarkdown(w){
   const lines=['# '+w.title,'','GOATwalk export · '+stamp(),'','Mode: '+modeLabel(w.mode),'','**ORDER ≠ SOURCE. A route through a note is not the note.**',''];
   w.stops.forEach((stop,index)=>{
-    const r=stopResolution(stop);
-    lines.push('## Stop '+(index+1)+' · '+(stop.noteTitleAtAdd||r.note?.title||'Missing source'),'');
-    lines.push('Address: note '+stop.noteId+' · version '+stop.versionId,'');
-    if(r.status==='exact')lines.push(stop.anchor?stop.anchor.quote:r.version.text,'');
-    else lines.push('[UNRESOLVED SOURCE: '+r.status+']','');
+    if(stop.kind==='walk'){
+      const child=walkById(stop.walkId);
+      lines.push('## Stop '+(index+1)+' · Walk door · '+(child?.title||stop.walkTitleAtAdd||'Missing Walk'),'');
+      lines.push(child?'Walk ID: '+child.id:'[UNRESOLVED WALK: '+stop.walkId+']','');
+    }else{
+      const r=stopResolution(stop);
+      lines.push('## Stop '+(index+1)+' · '+(stop.noteTitleAtAdd||r.note?.title||'Missing source'),'');
+      lines.push('Address: note '+stop.noteId+' · version '+stop.versionId,'');
+      if(r.status==='exact')lines.push(stop.anchor?stop.anchor.quote:r.version.text,'');
+      else lines.push('[UNRESOLVED SOURCE: '+r.status+']','');
+    }
     if(stop.transition)lines.push('### Transition','',stop.transition,'');
   });
   const blob=new Blob([lines.join('\n')],{type:'text/markdown;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download=(w.title.toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-|-$/g,'').slice(0,48)||'goatwalk')+'.md';
   document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+
+window.GOATwalkAPI={
+  getWalks:walks,
+  getWalk:walkById,
+  canNest,
+  addWalkDoor:(parentId,childId)=>{
+    const parent=walkById(parentId),child=walkById(childId);
+    return addWalkStop(parent,child);
+  },
+  playWalk:id=>{
+    const w=walkById(id);if(!w||!w.stops.length)return false;
+    activeWalkId=id;playerStack=[];playerIndex=0;openDialog('editor');renderPlayer();return true;
+  },
+  openWalk:id=>{
+    const w=walkById(id);if(!w)return false;
+    activeWalkId=id;openDialog('editor');return true;
+  }
+};
 
 injectHeader();
 })();
