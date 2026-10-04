@@ -285,7 +285,8 @@ function renderPlayer(){
     page.append(el('div',{class:'gw-eyebrow'},'WALK DOOR'),el('h3',{},resolved.walk?.title||stop.walkTitleAtAdd||'Missing Walk'));
     if(exact){
       page.append(el('div',{class:'gw-player-text'},modeLabel(resolved.walk.mode)+'\n\n'+resolved.walk.stops.length+' stop'+(resolved.walk.stops.length===1?'':'s')+' beyond this door.'));
-      const enter=el('button',{type:'button',class:'primary'},'ENTER WALK');
+      const enter=el('button',{type:'button',class:'primary'},resolved.walk.stops.length?'ENTER WALK':'EMPTY WALK');
+      enter.disabled=!resolved.walk.stops.length;
       enter.addEventListener('click',()=>{playerStack.push({walkId:w.id,index:playerIndex});activeWalkId=resolved.walk.id;playerIndex=0;renderPlayer();});
       page.append(enter);
     }else{
