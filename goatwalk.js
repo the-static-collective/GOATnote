@@ -25,6 +25,7 @@ const walkById=id=>walks().find(w=>w.id===id)||null;
 const save=()=>api.saveWalks(walks());
 const clip=(s,n=110)=>String(s||'').replace(/\s+/g,' ').trim().slice(0,n)+(String(s||'').replace(/\s+/g,' ').trim().length>n?'…':'');
 const modeLabel=m=>({story:'Story',plan:'Plan',memory:'Memory Room',playlist:'Playlist',free:'Free Walk'}[m]||'Walk');
+const edgeAPI=()=>window.GOATedgesAPI;
 
 function createWalk(title='Untitled Walk',mode='free'){
   const w={id:uid(),title:title.trim()||'Untitled Walk',mode,createdAt:stamp(),updatedAt:stamp(),stops:[]};
@@ -47,6 +48,10 @@ function stopResolution(stop){
     const walk=walkById(stop.walkId);
     return walk?{status:'exact',walk}:{status:'missing-walk',walk:null};
   }
+  if(stop.kind==='edge'){
+    const edge=edgeAPI()?.getEdge?.(stop.edgeId);
+    return edge?{status:'exact',edge}:{status:'missing-edge',edge:null};
+  }
   return api.resolveStop(stop);
 }
 
@@ -62,6 +67,11 @@ function addStop(w,target){
 function addWalkStop(w,child){
   if(!w||!child||!canNest(w.id,child.id))return null;
   const stop={id:uid(),kind:'walk',walkId:child.id,walkTitleAtAdd:child.title,transition:'',addedAt:stamp()};
+  w.stops.push(stop);touch(w);return stop;
+}
+function addEdgeStop(w,edge){
+  if(!w||!edge)return null;
+  const stop={id:uid(),kind:'edge',edgeId:edge.id,edgeTypeAtAdd:edge.type,transition:'',addedAt:stamp()};
   w.stops.push(stop);touch(w);return stop;
 }
 
@@ -188,13 +198,19 @@ function renderEditor(){
   const addWalk=el('button',{type:'button'},'+ WALK DOOR');
   addWalk.disabled=walkSelect.options.length<=1;
   addWalk.addEventListener('click',()=>{const child=walkById(walkSelect.value);if(child&&addWalkStop(w,child))renderEditor();});
+  const edgeSelect=el('select',{'aria-label':'Choose edge as a Walk stop'});
+  edgeSelect.append(el('option',{value:''},'Edge…'));
+  (edgeAPI()?.getEdges?.()||[]).forEach(edge=>edgeSelect.append(el('option',{value:edge.id},edge.type+' · '+edge.status)));
+  const addEdge=el('button',{type:'button'},'+ EDGE');
+  addEdge.disabled=edgeSelect.options.length<=1;
+  addEdge.addEventListener('click',()=>{const edge=edgeAPI()?.getEdge?.(edgeSelect.value);if(edge&&addEdgeStop(w,edge))renderEditor();});
   const play=el('button',{type:'button'},'WALK IT');
   play.disabled=!w.stops.length;
   play.addEventListener('click',()=>{playerStack=[];playerIndex=0;renderPlayer();});
   const exportMd=el('button',{type:'button'},'EXPORT .MD');
   exportMd.disabled=!w.stops.length;
   exportMd.addEventListener('click',()=>exportWalkMarkdown(w));
-  toolbar.append(addCurrent,walkSelect,addWalk,play,exportMd);root.append(toolbar);
+  toolbar.append(addCurrent,walkSelect,addWalk,edgeSelect,addEdge,play,exportMd);root.append(toolbar);
 
   const stopList=el('div',{class:'gw-stops'});
   if(!w.stops.length)stopList.append(el('p',{class:'muted'},'Select a passage or leave nothing selected for the whole note, then choose + CURRENT SOURCE.'));
@@ -217,14 +233,24 @@ function renderStopCard(w,stop,index){
   const head=el('div',{class:'gw-stop-head'});
   const title=stop.kind==='walk'
     ? (resolved.walk?.title||stop.walkTitleAtAdd||'Missing Walk')
-    : (stop.noteTitleAtAdd||resolved.note?.title||'Missing source');
+    : stop.kind==='edge'
+      ? (resolved.edge?.type||stop.edgeTypeAtAdd||'Missing edge')
+      : (stop.noteTitleAtAdd||resolved.note?.title||'Missing source');
   head.append(el('span',{class:'gw-number'},String(index+1).padStart(2,'0')),el('span',{class:'gw-source'},title));
-  const badge=el('span',{class:'gw-badge'},!exact?'UNRESOLVED':stop.kind==='walk'?'WALK DOOR':stop.anchor?'PASSAGE':'WHOLE NOTE');
+  const badge=el('span',{class:'gw-badge'},!exact?'UNRESOLVED':stop.kind==='walk'?'WALK DOOR':stop.kind==='edge'?('EDGE · '+resolved.edge.status.toUpperCase()):stop.anchor?'PASSAGE':'WHOLE NOTE');
   head.append(badge);card.append(head);
 
   if(stop.kind==='walk'){
     card.append(el('blockquote',{},exact?(modeLabel(resolved.walk.mode)+' · '+resolved.walk.stops.length+' stop'+(resolved.walk.stops.length===1?'':'s')):'Referenced Walk no longer exists.'));
     if(!exact)card.append(el('p',{class:'gw-warning'},'The Walk door is unresolved. GOATwalk will not redirect it to another Walk.'));
+  }else if(stop.kind==='edge'){
+    if(exact){
+      const desc=edgeAPI()?.describe?.(resolved.edge);
+      card.append(el('blockquote',{},desc?(desc.fromLabel+' → '+desc.toLabel):resolved.edge.type));
+      card.append(el('p',{class:'gw-edge-meta'},'First perceived '+new Date(resolved.edge.firstPerceivedAt).toLocaleString()+' · '+resolved.edge.confidence+' confidence'));
+    }else{
+      card.append(el('p',{class:'gw-warning'},'Referenced edge no longer exists. GOATwalk keeps the stop unresolved.'));
+    }
   }else{
     const excerpt=el('blockquote',{},stop.anchor?stop.anchor.quote:(exact?clip(resolved.text,260):'Source address no longer resolves exactly.'));
     card.append(excerpt);
@@ -239,13 +265,24 @@ function renderStopCard(w,stop,index){
   card.append(transition);
 
   const actions=el('div',{class:'gw-row'});
-  const open=el('button',{type:'button'},stop.kind==='walk'?'OPEN WALK':'OPEN SOURCE');
-  open.disabled=!exact;
-  open.addEventListener('click',()=>{if(stop.kind==='walk'){activeWalkId=resolved.walk.id;renderEditor();}else if(api.openStop(stop))dialog.close();});
+  let open;
+  if(stop.kind==='walk'){
+    open=el('button',{type:'button'},'OPEN WALK');open.disabled=!exact;open.addEventListener('click',()=>{activeWalkId=resolved.walk.id;renderEditor();});
+  }else if(stop.kind==='edge'){
+    open=el('button',{type:'button'},'INSPECT EDGE');open.disabled=!exact;open.addEventListener('click',()=>{dialog.close();edgeAPI()?.openEdge?.(stop.edgeId);});
+    const cross=el('button',{type:'button',class:'primary'},exact&&edgeAPI()?.isTraversable?.(resolved.edge)?'CROSS TO TARGET':'NOT TRAVERSABLE');
+    cross.disabled=!exact||!edgeAPI()?.isTraversable?.(resolved.edge);
+    cross.addEventListener('click',()=>{if(edgeAPI()?.openTo?.(stop.edgeId))dialog.close();});
+    actions.append(open,cross);
+  }else{
+    open=el('button',{type:'button'},'OPEN SOURCE');open.disabled=!exact;open.addEventListener('click',()=>{if(api.openStop(stop))dialog.close();});
+    actions.append(open);
+  }
+  if(stop.kind!=='edge')actions.append(open);
   const up=el('button',{type:'button','aria-label':'Move stop up'},'↑');up.disabled=index===0;up.addEventListener('click',()=>moveStop(w,index,index-1));
   const down=el('button',{type:'button','aria-label':'Move stop down'},'↓');down.disabled=index===w.stops.length-1;down.addEventListener('click',()=>moveStop(w,index,index+1));
   const remove=el('button',{type:'button',class:'danger'},'REMOVE');remove.addEventListener('click',()=>{w.stops.splice(index,1);touch(w);renderEditor();});
-  actions.append(open,up,down,remove);card.append(actions);
+  actions.append(up,down,remove);card.append(actions);
   return card;
 }
 function moveStop(w,from,to){const [x]=w.stops.splice(from,1);w.stops.splice(to,0,x);touch(w);renderEditor();}
@@ -292,6 +329,19 @@ function renderPlayer(){
     }else{
       page.append(el('p',{class:'gw-warning'},'This Walk door is unresolved. No substitute route is chosen.'));
     }
+  }else if(stop.kind==='edge'){
+    page.append(el('div',{class:'gw-eyebrow'},exact?('STAIRCASE · '+resolved.edge.status.toUpperCase()):'UNRESOLVED EDGE'),el('h3',{},resolved.edge?.type||stop.edgeTypeAtAdd||'Missing edge'));
+    if(exact){
+      const desc=edgeAPI()?.describe?.(resolved.edge);
+      page.append(el('div',{class:'gw-player-text'},(desc?desc.fromLabel+'\n\n→ '+resolved.edge.type+' →\n\n'+desc.toLabel:resolved.edge.type)+'\n\nFirst perceived: '+new Date(resolved.edge.firstPerceivedAt).toLocaleString()+'\nConfidence: '+resolved.edge.confidence));
+      const inspect=el('button',{type:'button'},'INSPECT EDGE');inspect.addEventListener('click',()=>{dialog.close();edgeAPI()?.openEdge?.(stop.edgeId);});
+      const cross=el('button',{type:'button',class:'primary'},edgeAPI()?.isTraversable?.(resolved.edge)?'CROSS TO TARGET':'NOT TRAVERSABLE');
+      cross.disabled=!edgeAPI()?.isTraversable?.(resolved.edge);
+      cross.addEventListener('click',()=>{if(edgeAPI()?.openTo?.(stop.edgeId))dialog.close();});
+      page.append(inspect,cross);
+    }else{
+      page.append(el('p',{class:'gw-warning'},'This edge address is unresolved. The Walk does not substitute another relation.'));
+    }
   }else{
     page.append(el('div',{class:'gw-eyebrow'},stop.anchor?'PASSAGE':'SOURCE'),el('h3',{},stop.noteTitleAtAdd||resolved.note?.title||'Missing source'));
     if(exact){
@@ -320,6 +370,15 @@ function exportWalkMarkdown(w){
       const child=walkById(stop.walkId);
       lines.push('## Stop '+(index+1)+' · Walk door · '+(child?.title||stop.walkTitleAtAdd||'Missing Walk'),'');
       lines.push(child?'Walk ID: '+child.id:'[UNRESOLVED WALK: '+stop.walkId+']','');
+    }else if(stop.kind==='edge'){
+      const edge=edgeAPI()?.getEdge?.(stop.edgeId),desc=edge?edgeAPI()?.describe?.(edge):null;
+      lines.push('## Stop '+(index+1)+' · Staircase · '+(edge?.type||stop.edgeTypeAtAdd||'Missing edge'),'');
+      if(edge&&desc){
+        lines.push('Status: '+edge.status+' · confidence: '+edge.confidence,'');
+        lines.push('First perceived: '+edge.firstPerceivedAt,'');
+        lines.push('From: '+desc.fromLabel,'','To: '+desc.toLabel,'');
+        lines.push('Discovery trace: '+edge.discoveryTrace,'','Evidence path: '+edge.evidencePath,'');
+      }else lines.push('[UNRESOLVED EDGE: '+stop.edgeId+']','');
     }else{
       const r=stopResolution(stop);
       lines.push('## Stop '+(index+1)+' · '+(stop.noteTitleAtAdd||r.note?.title||'Missing source'),'');
@@ -341,6 +400,10 @@ window.GOATwalkAPI={
   addWalkDoor:(parentId,childId)=>{
     const parent=walkById(parentId),child=walkById(childId);
     return addWalkStop(parent,child);
+  },
+  addEdgeStop:(walkId,edgeId)=>{
+    const w=walkById(walkId),edge=edgeAPI()?.getEdge?.(edgeId);
+    return addEdgeStop(w,edge);
   },
   playWalk:id=>{
     const w=walkById(id);if(!w||!w.stops.length)return false;

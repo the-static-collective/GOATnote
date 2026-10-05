@@ -2,6 +2,7 @@
 'use strict';
 const core=window.GOATnoteWalkAPI;
 const walkAPI=window.GOATwalkAPI;
+const edgeAPI=()=>window.GOATedgesAPI;
 if(!core||!walkAPI)return;
 
 const uid=core.uid;
@@ -42,10 +43,17 @@ function sourceItem(target){
 function walkItem(walk){
   return {id:uid(),kind:'walk',walkId:walk.id,walkTitleAtAdd:walk.title,addedAt:stamp()};
 }
+function edgeItem(edge){
+  return {id:uid(),kind:'edge',edgeId:edge.id,edgeTypeAtAdd:edge.type,addedAt:stamp()};
+}
 function addSource(room,target){room.items.push(sourceItem(target));touch(room);}
 function addWalk(room,walk){
   if(room.items.some(i=>i.kind==='walk'&&i.walkId===walk.id))return false;
   room.items.push(walkItem(walk));touch(room);return true;
+}
+function addEdge(room,edge){
+  if(room.items.some(i=>i.kind==='edge'&&i.edgeId===edge.id))return false;
+  room.items.push(edgeItem(edge));touch(room);return true;
 }
 
 function injectHeader(){
@@ -168,11 +176,21 @@ function renderRoom(){
     if(walk&&addWalk(room,walk))renderRoom();
   });
 
+  const edgeSelect=el('select',{'aria-label':'Choose edge for Room'});
+  edgeSelect.append(el('option',{value:''},'Edge…'));
+  (edgeAPI()?.getEdges?.()||[]).forEach(edge=>edgeSelect.append(el('option',{value:edge.id},edge.type+' · '+edge.status)));
+  const addEdgeBtn=el('button',{type:'button'},'+ EDGE');
+  addEdgeBtn.disabled=edgeSelect.options.length<=1;
+  addEdgeBtn.addEventListener('click',()=>{
+    const edge=edgeAPI()?.getEdge?.(edgeSelect.value);
+    if(edge&&addEdge(room,edge))renderRoom();
+  });
+
   const exportMd=el('button',{type:'button'},'EXPORT ROOM .MD');
   exportMd.disabled=!room.items.length;
   exportMd.addEventListener('click',()=>exportRoom(room));
 
-  tools.append(addCurrent,walkSelect,addWalkBtn,exportMd);root.append(tools);
+  tools.append(addCurrent,walkSelect,addWalkBtn,edgeSelect,addEdgeBtn,exportMd);root.append(tools);
 
   const field=el('div',{class:'gr-field'});
   if(!room.items.length)field.append(el('p',{class:'muted'},'This Room is empty. Place source addresses or Walk doors here.'));
@@ -189,6 +207,29 @@ function renderRoom(){
 }
 
 function renderItem(room,item,index){
+  if(item.kind==='edge'){
+    const edge=edgeAPI()?.getEdge?.(item.edgeId);
+    const desc=edge?edgeAPI()?.describe?.(edge):null;
+    const card=el('article',{class:'gr-item gr-edge'+(edge?'':' unresolved')});
+    card.append(
+      el('div',{class:'gr-eyebrow'},edge?'STAIRCASE · '+String(edge.status).toUpperCase():'UNRESOLVED EDGE'),
+      el('h3',{},edge?.type||item.edgeTypeAtAdd||'Missing edge')
+    );
+    if(edge&&desc){
+      card.append(el('p',{class:'gr-meta'},desc.fromLabel+' → '+desc.toLabel));
+      card.append(el('p',{},'First perceived '+new Date(edge.firstPerceivedAt).toLocaleString()+' · '+edge.confidence+' confidence'));
+      if(desc.fromResolved!=='exact'||desc.toResolved!=='exact')card.append(el('p',{class:'gr-warning'},'One or both endpoint addresses are unresolved.'));
+    }else{
+      card.append(el('p',{class:'gr-warning'},'Referenced edge no longer exists. The Room keeps the address instead of redirecting it.'));
+    }
+    const row=el('div',{class:'gr-row'});
+    const inspect=el('button',{type:'button'},'INSPECT EDGE');inspect.disabled=!edge;inspect.addEventListener('click',()=>{dialog.close();edgeAPI()?.openEdge?.(item.edgeId);});
+    const cross=el('button',{type:'button',class:'primary'},edge&&edgeAPI()?.isTraversable?.(edge)?'CROSS TO TARGET':'NOT TRAVERSABLE');
+    cross.disabled=!edge||!edgeAPI()?.isTraversable?.(edge);
+    cross.addEventListener('click',()=>{if(edgeAPI()?.openTo?.(item.edgeId))dialog.close();});
+    const remove=el('button',{type:'button',class:'danger'},'REMOVE');remove.addEventListener('click',()=>{room.items.splice(index,1);touch(room);renderRoom();});
+    row.append(inspect,cross,remove);card.append(row);return card;
+  }
   if(item.kind==='walk'){
     const walk=walkAPI.getWalk(item.walkId);
     const card=el('article',{class:'gr-item gr-door'+(walk?'':' unresolved')});
@@ -227,7 +268,16 @@ function renderItem(room,item,index){
 function exportRoom(room){
   const lines=['# '+room.title,'','GOATroom export · '+stamp(),'','**ROOM ≠ ROUTE. Placement ≠ chronology. Adjacency ≠ causation.**',''];
   room.items.forEach(item=>{
-    if(item.kind==='walk'){
+    if(item.kind==='edge'){
+      const edge=edgeAPI()?.getEdge?.(item.edgeId),desc=edge?edgeAPI()?.describe?.(edge):null;
+      lines.push('## Staircase · '+(edge?.type||item.edgeTypeAtAdd||'Missing edge'),'');
+      if(edge&&desc){
+        lines.push('Status: '+edge.status+' · confidence: '+edge.confidence,'');
+        lines.push('First perceived: '+edge.firstPerceivedAt,'');
+        lines.push('From: '+desc.fromLabel,'','To: '+desc.toLabel,'');
+        lines.push('Discovery trace: '+edge.discoveryTrace,'','Evidence path: '+edge.evidencePath,'');
+      }else lines.push('[UNRESOLVED EDGE: '+item.edgeId+']','');
+    }else if(item.kind==='walk'){
       const walk=walkAPI.getWalk(item.walkId);
       lines.push('## Walk door · '+(walk?.title||item.walkTitleAtAdd||'Missing Walk'),'');
       lines.push(walk?'Walk ID: '+walk.id+' · '+walkLabel(walk)+' · '+walk.stops.length+' stops':'[UNRESOLVED WALK: '+item.walkId+']','');
