@@ -90,7 +90,7 @@ dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
 
 function openDialog(edgeId=null){
   if(!dialog.open)dialog.showModal();
-  if(edgeId){editingEdgeId=edgeId;renderEditor(edgeById(edgeId));}
+  if(edgeId){editingEdgeId=edgeId;heldFrom=null;heldTo=null;renderEditor(edgeById(edgeId));}
   else renderList();
 }
 
