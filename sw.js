@@ -1,6 +1,6 @@
 /* GOATnote app-shell cache only. Never cache notebook contents or JSON exports. */
-const SHELL='goatnote-shell-v4';
-const FILES=['./','./index.html','./goatwalk.js','./goatwalk.css','./goatrooms.js','./goatrooms.css','./goatedges.js','./goatedges.css','./manifest.webmanifest','./icon.svg'];
+const SHELL='goatnote-shell-v5';
+const FILES=['./','./index.html','./goatwalk.js','./goatwalk.css','./goatrooms.js','./goatrooms.css','./goatedges.js','./goatedges.css','./goattime.js','./goattime.css','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(SHELL).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()));
 });
