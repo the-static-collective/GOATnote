@@ -56,6 +56,12 @@ function appendRevision(edge,kind,note=''){
     kind,
     status:edge.status,
     confidence:edge.confidence,
+    type:edge.type,
+    discoveryTrace:edge.discoveryTrace,
+    evidencePath:edge.evidencePath,
+    firstPerceivedAt:edge.firstPerceivedAt,
+    from:copyEndpoint(edge.from),
+    to:copyEndpoint(edge.to),
     note:String(note||'')
   });
 }
@@ -213,8 +219,17 @@ function renderEditor(edge){
     const perceivedDate=new Date(perceived.value);
     if(Number.isNaN(perceivedDate.getTime())){alert('First perceived time is invalid.');return;}
     if(edge){
-      const changed=edge.status!==status.value||edge.confidence!==confidence.value||edge.type!==type.value.trim()||edge.discoveryTrace!==discovery.value.trim()||edge.evidencePath!==evidence.value.trim();
-      edge.from=copyEndpoint(heldFrom);edge.to=copyEndpoint(heldTo);edge.type=type.value.trim();edge.firstPerceivedAt=perceivedDate.toISOString();
+      const nextFrom=copyEndpoint(heldFrom),nextTo=copyEndpoint(heldTo),nextPerceived=perceivedDate.toISOString();
+      const changed=
+        edge.status!==status.value||
+        edge.confidence!==confidence.value||
+        edge.type!==type.value.trim()||
+        edge.discoveryTrace!==discovery.value.trim()||
+        edge.evidencePath!==evidence.value.trim()||
+        edge.firstPerceivedAt!==nextPerceived||
+        JSON.stringify(edge.from)!==JSON.stringify(nextFrom)||
+        JSON.stringify(edge.to)!==JSON.stringify(nextTo);
+      edge.from=nextFrom;edge.to=nextTo;edge.type=type.value.trim();edge.firstPerceivedAt=nextPerceived;
       edge.discoveryTrace=discovery.value.trim();edge.evidencePath=evidence.value.trim();edge.confidence=confidence.value;edge.status=status.value;edge.updatedAt=stamp();
       if(changed)appendRevision(edge,'revision',revisionNote.value.trim());
       save();renderEditor(edge);
@@ -260,6 +275,36 @@ function labelWrap(label,control){
   wrap.append(el('span',{},label),control);return wrap;
 }
 
+function stateAt(edge,cut){
+  if(!edge)return null;
+  const t=cut instanceof Date?cut:new Date(cut);
+  if(Number.isNaN(t.getTime()))return null;
+  const born=new Date(edge.firstPerceivedAt);
+  if(Number.isNaN(born.getTime())||t<born)return {status:'not-yet-perceived',confidence:null,recordedAt:null,edge};
+  const events=history(edge)
+    .filter(r=>r&&r.at&&!Number.isNaN(new Date(r.at).getTime())&&new Date(r.at)<=t)
+    .sort((a,b)=>new Date(a.at)-new Date(b.at));
+  const last=events[events.length-1];
+  if(last){
+    return {
+      status:last.status||'perceived',
+      confidence:last.confidence||null,
+      type:last.type||edge.type,
+      discoveryTrace:last.discoveryTrace??edge.discoveryTrace,
+      evidencePath:last.evidencePath??edge.evidencePath,
+      firstPerceivedAt:last.firstPerceivedAt||edge.firstPerceivedAt,
+      from:last.from||edge.from,
+      to:last.to||edge.to,
+      recordedAt:last.at,
+      edge
+    };
+  }
+  if(edge.createdAt&&new Date(edge.createdAt)<=t){
+    return {status:edge.status,confidence:edge.confidence,type:edge.type,discoveryTrace:edge.discoveryTrace,evidencePath:edge.evidencePath,firstPerceivedAt:edge.firstPerceivedAt,from:edge.from,to:edge.to,recordedAt:edge.createdAt,edge};
+  }
+  return {status:'perceived',confidence:null,type:edge.type,discoveryTrace:edge.discoveryTrace,evidencePath:'not recorded at this cut',firstPerceivedAt:edge.firstPerceivedAt,from:edge.from,to:edge.to,recordedAt:null,edge};
+}
+
 function describe(edge){
   if(!edge)return null;
   return {
@@ -282,6 +327,7 @@ window.GOATedgesAPI={
   getEdges:edges,
   getEdge:edgeById,
   describe,
+  stateAt,
   isTraversable,
   openEdge:id=>{const edge=edgeById(id);if(!edge)return false;openDialog(id);return true;},
   openFrom:id=>{const edge=edgeById(id);return !!edge&&core.openStop({...edge.from,id:'edge-from'});},
