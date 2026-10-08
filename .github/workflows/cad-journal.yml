@@ -1,0 +1,32 @@
+name: GOATnote CAD Journal 001 — immutable sources and selected import
+on:
+  push:
+    branches:
+      - experiment/cad-journal-001
+  pull_request:
+    paths:
+      - "cad-journal.mjs"
+      - "cad-journal-ui.mjs"
+      - "index.html"
+      - "sw.js"
+      - "tests/cad-journal.test.mjs"
+      - "docs/CAD-JOURNAL-001.md"
+      - ".github/workflows/cad-journal.yml"
+jobs:
+  cad-journal:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check GOATnote modules and source UI
+        run: |
+          node --check cad-journal.mjs
+          node --check cad-journal-ui.mjs
+      - name: CAD-journal provenance, source immutability and hostile consent tests
+        run: node tests/cad-journal.test.mjs
+      - name: Inherited GOATnote offline notebook source/Return Thread smoke
+        run: node tests/smoke.mjs
