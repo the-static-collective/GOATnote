@@ -17,9 +17,8 @@ const noAuthority = event => event.authority_effect === "none"
   && event.model_private_reasoning_captured === false;
 
 export function verifyCadJournalHandoff(value) {
-  safe(object(value) && Object.keys(value).sort().join("|") === [
-    "evidence", "schema", "trace"
-  ].sort().join("|"), "EXACT_CAD_HANDOFF_REQUIRED");
+  safe(object(value) && ["evidence|schema|trace","branch|evidence|schema|trace"]
+       .includes(Object.keys(value).sort().join("|")), "EXACT_CAD_HANDOFF_REQUIRED");
   safe(value.schema === CAD_JOURNAL_SCHEMA, "INVALID_GOAT_CAD_SCHEMA");
   const evidence = value.evidence;
   const trace = value.trace;
@@ -69,6 +68,28 @@ export function verifyCadJournalHandoff(value) {
   });
   safe(trace.head === previous && trace.trace_id === evidence.trace_id,
        "CAD_LEDGER_HEAD_MISMATCH");
+  if (value.branch !== undefined) {
+    const b = value.branch;
+    safe(object(b) && Object.keys(b).sort().join("|") === [
+      "schema","tree_id","selected_candidate_id","parent_sketch_id",
+      "selected_revision_sketch_id","alternatives_not_executed",
+      "owner_choice","construction_authorized"
+    ].sort().join("|"), "EXACT_CAD_BRANCH_WITNESS_REQUIRED");
+    safe(b.schema === "static-os.cad-feature-branch-provenance/v0"
+       && b.construction_authorized === false
+       && b.owner_choice === "EXPLICIT_LOCAL_SOFTWARE_SELECTION"
+       && b.selected_revision_sketch_id === evidence.source_sketch_id
+       && typeof b.parent_sketch_id === "string"
+       && b.parent_sketch_id.startsWith("static-os-solved-sketch-v0:")
+       && typeof b.tree_id === "string"
+       && b.tree_id.startsWith("static-os-cad-feature-tree-v0:")
+       && ["pad-deeper","bore-wider"].includes(b.selected_candidate_id)
+       && Array.isArray(b.alternatives_not_executed)
+       && b.alternatives_not_executed.length === 1
+       && ["pad-deeper","bore-wider"].includes(b.alternatives_not_executed[0])
+       && b.alternatives_not_executed[0] !== b.selected_candidate_id,
+       "CAD_BRANCH_SOURCE_OR_AUTHORITY_MISMATCH");
+  }
   // Native reLATTE signature/byte checks happen at the Static-OS donor.
   // GOATnote is source-preserving and does not claim independent verification.
   return value;
@@ -87,6 +108,12 @@ export function projectCadJournal(handoff) {
     "STATIC-CAD / GOATnote — frozen evidence source",
     "Posture: "+SOURCE_POSTURE,
     "Source sketch: "+e.source_sketch_id,
+    ...(h.branch ? [
+      "Feature tree: "+h.branch.tree_id,
+      "Branch parent: "+h.branch.parent_sketch_id,
+      "Selected branch: "+h.branch.selected_candidate_id,
+      "Unselected candidate (NOT executed here): "+h.branch.alternatives_not_executed.join(", "),
+    ] : []),
     "Decision trace: "+e.trace_id,
     "Solid manifest: "+e.manifest_id,
     "Native reLATTE crossing: "+e.crossing_id,
@@ -129,7 +156,9 @@ export function projectCadJournal(handoff) {
     entries:[
       {id:"cadreturn-question-"+digestId(e.trace_id),
        kind:"question",
-       text:"Which source-grounded CAD feature or engineering uncertainty should we test next?",
+       text: h.branch ? ("Which experiment can compare "+h.branch.selected_candidate_id+
+          " against unexecuted "+h.branch.alternatives_not_executed.join(", ")+"?") :
+          "Which source-grounded CAD feature or engineering uncertainty should we test next?",
        createdAt:stamp},
       {id:"cadreturn-carry-"+digestId(e.trace_id),
        kind:"carry",
