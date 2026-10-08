@@ -89,6 +89,27 @@ const bad3=structuredClone(handoff);bad3.trace.events[0].alternatives_considered
 expectFailure(bad3,"selected alternative unlisted");
 const bad4=structuredClone(handoff);bad4.extra="RUN_MACHINES";
 expectFailure(bad4,"extra action");
+const branchHandoff=structuredClone(handoff);
+branchHandoff.branch={
+  schema:"static-os.cad-feature-branch-provenance/v0",
+  tree_id:ident("static-os-cad-feature-tree-v0","7"),
+  selected_candidate_id:"pad-deeper",
+  parent_sketch_id:ident("static-os-solved-sketch-v0","8"),
+  selected_revision_sketch_id:source,
+  alternatives_not_executed:["bore-wider"],
+  owner_choice:"EXPLICIT_LOCAL_SOFTWARE_SELECTION",
+  construction_authorized:false,
+};
+const branchPage=projectCadJournal(branchHandoff);
+assert.match(branchPage.draft,/Selected branch: pad-deeper/);
+assert.match(branchPage.draft,/NOT executed here/);
+assert.match(branchPage.returnThreads[0].entries[0].text,/bore-wider/);
+const swapped=structuredClone(branchHandoff);
+swapped.branch.selected_revision_sketch_id=ident("static-os-solved-sketch-v0","f");
+expectFailure(swapped,"rebound source");
+const granted=structuredClone(branchHandoff);
+granted.branch.construction_authorized=true;
+expectFailure(granted,"fabrication claimed");
 const ui=readFileSync(new URL("../index.html",import.meta.url),"utf8");
 assert.match(ui,/id="importCadJournal"/);
 assert.match(ui,/cad-journal-ui.mjs/);
