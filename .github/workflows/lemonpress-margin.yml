@@ -1,0 +1,46 @@
+name: GOATnote LemonPRESS selected-margin 004
+on:
+  push:
+    branches:
+      - experiment/lemonpress-marginalia-export-004
+  pull_request:
+    paths:
+      - "lemonpress-margin.mjs"
+      - "lemonpress-margin-ui.mjs"
+      - "index.html"
+      - "sw.js"
+      - "tests/lemonpress-margin.test.mjs"
+      - "tests/lemonpress_margin_browser.py"
+      - "docs/LEMONPRESS-MARGIN-004.md"
+      - ".github/workflows/lemonpress-margin.yml"
+jobs:
+  private-selection:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Source selection and inherited refusal checks
+        run: |
+          node --check lemonpress-margin.mjs
+          node --check lemonpress-margin-ui.mjs
+          node tests/lemonpress-margin.test.mjs
+          node tests/recovery-gate.test.mjs
+          node tests/receipt-relations.test.mjs
+          node tests/webz-receipt.test.mjs
+          node tests/cad-journal.test.mjs
+          node tests/smoke.mjs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Chromium
+        run: |
+          python -m pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: "Mobile Chromium: no passive disclosure and deliberate single-margin export"
+        run: |
+          python tests/lemonpress_margin_browser.py
+          python tests/recovery_browser.py
