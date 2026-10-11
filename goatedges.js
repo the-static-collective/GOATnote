@@ -30,7 +30,7 @@ function copyEndpoint(target){
   return {
     noteId:target.noteId,
     versionId:target.versionId,
-    noteTitleAtAdd:target.noteTitle||'Untitled',
+    noteTitleAtAdd:target.noteTitle||target.noteTitleAtAdd||'Untitled',
     anchor:target.anchor?{start:target.anchor.start,end:target.anchor.end,quote:target.anchor.quote}:null
   };
 }
@@ -151,6 +151,7 @@ function endpointCard(label,endpoint,side){
     box.append(el('p',{class:'muted'},'Nothing held yet.'));
   }
   const hold=el('button',{type:'button'},'HOLD CURRENT AS '+side);
+  hold.disabled=!!editingEdgeId&&edgeById(editingEdgeId)?.receiptRelation?.originalEndpointsLocked===true;
   hold.addEventListener('click',()=>{
     try{
       const target=captureCurrent();
@@ -186,6 +187,7 @@ function renderEditor(edge){
   const d=edge?new Date(edge.firstPerceivedAt):new Date();
   const local=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
   perceived.value=local;
+  if(edge?.receiptRelation?.originalEndpointsLocked===true)perceived.disabled=true;
 
   const status=el('select',{'aria-label':'Edge status'});
   ['perceived','proposed','admitted','weakened','refused','unresolved'].forEach(v=>{
@@ -218,6 +220,11 @@ function renderEditor(edge){
     if(!type.value.trim()||!discovery.value.trim()||!evidence.value.trim()){alert('Type, discovery trace, and evidence path are required.');return;}
     const perceivedDate=new Date(perceived.value);
     if(Number.isNaN(perceivedDate.getTime())){alert('First perceived time is invalid.');return;}
+    if(edge&&edge.receiptRelation?.originalEndpointsLocked===true&&(
+      perceivedDate.toISOString()!==edge.receiptRelation.observedAt||
+      JSON.stringify(heldFrom)!==JSON.stringify(edge.from)||
+      JSON.stringify(heldTo)!==JSON.stringify(edge.to)
+    )){alert('Receipt relation birthday and original endpoints are immutable; create a new relation instead.');return;}
     if(edge){
       const nextFrom=copyEndpoint(heldFrom),nextTo=copyEndpoint(heldTo),nextPerceived=perceivedDate.toISOString();
       const changed=

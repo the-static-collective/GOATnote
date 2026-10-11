@@ -1,0 +1,38 @@
+name: GOATnote Receipt Relations 002 — time-cut historical evidence
+on:
+  push:
+    branches:
+      - experiment/receipt-relations-timecut-002
+  pull_request:
+    paths:
+      - "receipt-relations.mjs"
+      - "receipt-relations-ui.mjs"
+      - "goatedges.js"
+      - "index.html"
+      - "sw.js"
+      - "tests/receipt-relations.test.mjs"
+      - "docs/RECEIPT-RELATIONS-002.md"
+      - ".github/workflows/receipt-relations.yml"
+jobs:
+  recorded-relations:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax
+        run: |
+          node --check receipt-relations.mjs
+          node --check receipt-relations-ui.mjs
+          node --check goatedges.js
+          node --check goattime.js
+      - name: Native relationship and historical as-of verification
+        run: node tests/receipt-relations.test.mjs
+      - name: Inherited receipt and CAD sources + GOATnote smoke
+        run: |
+          node tests/webz-receipt.test.mjs
+          node tests/cad-journal.test.mjs
+          node tests/smoke.mjs
