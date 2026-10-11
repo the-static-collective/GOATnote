@@ -1,0 +1,34 @@
+name: Receipt Glass × GOATnote — deliberate human witness
+on:
+  push:
+    branches:
+      - experiment/receipt-glass-goatnote-001
+  pull_request:
+    paths:
+      - "webz-receipt.mjs"
+      - "webz-receipt-ui.mjs"
+      - "index.html"
+      - "sw.js"
+      - "tests/webz-receipt.test.mjs"
+      - "docs/WEBZ-RECEIPT-GOATNOTE-001.md"
+      - ".github/workflows/webz-receipt.yml"
+jobs:
+  webz-receipt:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check import module syntax
+        run: |
+          node --check webz-receipt.mjs
+          node --check webz-receipt-ui.mjs
+      - name: Test deliberate handoff source integrity and refusal rules
+        run: node tests/webz-receipt.test.mjs
+      - name: Check inherited CAD return and source history
+        run: |
+          node tests/cad-journal.test.mjs
+          node tests/smoke.mjs
