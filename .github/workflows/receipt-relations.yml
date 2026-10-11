@@ -29,8 +29,17 @@ jobs:
           node --check receipt-relations-ui.mjs
           node --check goatedges.js
           node --check goattime.js
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Chromium browser witness
+        run: |
+          python -m pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
       - name: Native relationship and historical as-of verification
         run: node tests/receipt-relations.test.mjs
+      - name: Real Chromium: consent, source freeze, TIME-CUT and mobile path
+        run: python tests/receipt_relations_browser.py
       - name: Inherited receipt and CAD sources + GOATnote smoke
         run: |
           node tests/webz-receipt.test.mjs

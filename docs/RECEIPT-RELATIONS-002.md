@@ -33,6 +33,6 @@ A person imports WebZ evidence as one frozen source, then notices a relationship
 - \`goatedges.js\` — fixes existing note title carry and locks birthday/endpoints for flagged receipt relations while allowing ordinary human stance revisions.
 - \`tests/receipt-relations.test.mjs\` — adversarial consent/source/address checks and **real native GOATedges + GOATtimeAPI.snapshot** temporal replay under an isolated DOM facade.
 
-Run \`node tests/receipt-relations.test.mjs\`, \`node tests/webz-receipt.test.mjs\`, \`node tests/cad-journal.test.mjs\`, \`node tests/smoke.mjs\` and \`node --check\` on modified modules. A full physical-device browser, accessibility and persistence/restore review is still a separate release gate.
+Run \`node tests/receipt-relations.test.mjs\`, \`node tests/webz-receipt.test.mjs\`, \`node tests/cad-journal.test.mjs\`, \`node tests/smoke.mjs\` and \`node --check\` on modified modules. The new `tests/receipt_relations_browser.py` runs real headless Chromium at root and nested paths with a mobile viewport; it exercises explicit source selection, real confirmation, notebook reload, native GOATedges non-traversability, and native TIME-CUT before/after cuts. Physical-device, accessibility, and longer-term backup/restore review remain separate release gates.
 
 **FIRST PERCEPTION != SOURCE BIRTH. CURRENT ROOM MEMBERSHIP != HISTORICAL ROOM MEMBERSHIP. EVIDENCE REF != ANCESTRY PROOF. GOATEDGE ADMISSION != reLATTE ADMISSION. REUNION != REVERSAL.**
