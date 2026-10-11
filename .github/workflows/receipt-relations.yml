@@ -39,7 +39,7 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Native relationship and historical as-of verification
         run: node tests/receipt-relations.test.mjs
-      - name: Real Chromium: consent, source freeze, TIME-CUT and mobile path
+      - name: "Real Chromium: consent, source freeze, TIME-CUT and mobile path"
         run: python tests/receipt_relations_browser.py
       - name: Inherited receipt and CAD sources + GOATnote smoke
         run: |
