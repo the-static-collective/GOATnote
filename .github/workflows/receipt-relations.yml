@@ -11,6 +11,7 @@ on:
       - "index.html"
       - "sw.js"
       - "tests/receipt-relations.test.mjs"
+      - "tests/receipt_relations_browser.py"
       - "docs/RECEIPT-RELATIONS-002.md"
       - ".github/workflows/receipt-relations.yml"
 jobs:
