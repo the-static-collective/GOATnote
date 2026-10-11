@@ -1,0 +1,45 @@
+name: GOATnote Recovery Gate 003 — whole notebook restore
+on:
+  push:
+    branches:
+      - experiment/receipt-recovery-gate-003
+  pull_request:
+    paths:
+      - "recovery.mjs"
+      - "recovery-ui.mjs"
+      - "index.html"
+      - "sw.js"
+      - "tests/recovery-gate.test.mjs"
+      - "tests/recovery_browser.py"
+      - "docs/RECOVERY-GATE-003.md"
+      - ".github/workflows/recovery-gate.yml"
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Recovery syntax and full history regression
+        run: |
+          node --check recovery.mjs
+          node --check recovery-ui.mjs
+          node tests/recovery-gate.test.mjs
+          node tests/receipt-relations.test.mjs
+          node tests/webz-receipt.test.mjs
+          node tests/cad-journal.test.mjs
+          node tests/smoke.mjs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser witness
+        run: |
+          python -m pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: "Touch Chromium: backup export, tamper, fresh profile restore, TIME-CUT"
+        run: |
+          python tests/recovery_browser.py
+          python tests/receipt_relations_browser.py
